@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>해수면을 지켜라</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ 시작 화면 ============ -->
+  <section id="screen-start" class="screen active">
+    <div class="panel">
+      <h1 class="title">🌊해수면을 지켜라🌊</h1>
+      <p class="subtitle">떨어지는 원소를 정답을 입력해서 없애자! 물이 차오르기 전에 살아남아라!</p>
+
+      <div class="howto-box">
+        <h2 class="howto-title">📋 게임 방법</h2>
+        <ol class="howto-list">
+          <li>떨어지는 원소 이름을 확인한다.</li>
+          <li>원소 기호를 입력하고, <kbd>Enter</kbd>를 누른다.</li>
+          <li>연속 정답 시 콤보 보너스, 바다의 수위가 조금씩 낮아진다.</li>
+          <li>틀리면 감점. 원소가 바다에 닿으면 수위 상승. 수위가 최고치에 다다르면 종료!</li>
+          <li>다음 레벨부터 속도가 빨라집니다.</li>
+        </ol>
+      </div>
+
+      <div class="option-group">
+        <h2>1. 난이도 선택</h2>
+        <div class="btn-row" id="difficulty-row">
+          <button class="option-btn" data-difficulty="beginner">
+            <span class="opt-title">초보</span>
+            <span class="opt-desc">원자번호 1~20번</span>
+          </button>
+          <button class="option-btn" data-difficulty="intermediate">
+            <span class="opt-title">중급</span>
+            <span class="opt-desc">1~20번 + 대표 원소 7개</span>
+          </button>
+          <button class="option-btn" data-difficulty="advanced">
+            <span class="opt-title">상급</span>
+            <span class="opt-desc">중급 + 추가 원소 7개</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="option-group">
+        <h2>2. 입력 방식 선택</h2>
+        <div class="btn-row" id="mode-row">
+          <button class="option-btn" data-mode="symbol">
+            <span class="opt-title">원소 기호</span>
+            <span class="opt-desc">예: Na, Cl, Fe</span>
+          </button>
+          <button class="option-btn" data-mode="name">
+            <span class="opt-title">원소 이름</span>
+            <span class="opt-desc">예: 나트륨, 염소, 철</span>
+          </button>
+        </div>
+      </div>
+
+      <button id="btn-start" class="primary-btn" disabled>게임 시작</button>
+      <button id="btn-goto-ranking" class="secondary-btn">🏆 명예의 전당 보기</button>
+    </div>
+  </section>
+
+  <!-- ============ 게임 화면 ============ -->
+  <section id="screen-game" class="screen">
+    <div class="hud">
+      <div class="hud-item">난이도: <span id="hud-difficulty">-</span></div>
+      <div class="hud-item">단계: <span id="hud-stage">1</span> / 10</div>
+      <div class="hud-item">점수: <span id="hud-score">0</span></div>
+      <div class="hud-item">콤보: <span id="hud-combo">0</span></div>
+      <div class="hud-item">정답: <span id="hud-correct">0</span></div>
+      <div class="hud-item">⏱ <span id="hud-time">0</span>초</div>
+      <button id="btn-pause" class="pause-btn">⏸ 일시정지</button>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="game-canvas" width="800" height="500"></canvas>
+      <div id="stage-banner" class="stage-banner hidden"></div>
+      <div id="pause-overlay" class="pause-overlay hidden">
+        <div class="pause-box">
+          <p>⏸ 일시정지 중</p>
+          <button id="btn-resume" class="primary-btn">▶ 계속하기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="type-area">
+      <input type="text" id="type-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="입력 후 Enter" />
+    </div>
+  </section>
+
+  <!-- ============ 결과(게임오버) 화면 ============ -->
+  <section id="screen-result" class="screen">
+    <div class="panel">
+      <h1 class="title">🌊 게임 종료 🌊</h1>
+      <div class="result-stats">
+        <div class="stat-box"><span class="stat-label">난이도</span><span class="stat-value" id="res-difficulty">-</span></div>
+        <div class="stat-box"><span class="stat-label">점수</span><span class="stat-value" id="res-score">0</span></div>
+        <div class="stat-box"><span class="stat-label">도달 단계</span><span class="stat-value" id="res-stage">1</span></div>
+        <div class="stat-box"><span class="stat-label">최고 콤보</span><span class="stat-value" id="res-combo">0</span></div>
+        <div class="stat-box"><span class="stat-label">정답 수</span><span class="stat-value" id="res-correct">0</span></div>
+        <div class="stat-box"><span class="stat-label">생존 시간</span><span class="stat-value" id="res-time">0초</span></div>
+      </div>
+
+      <div class="register-form">
+        <h2>명예의 전당에 등록하기</h2>
+        <div class="form-row">
+          <label for="input-class">반</label>
+          <select id="input-class">
+            <option value="1">1반</option>
+            <option value="2">2반</option>
+            <option value="3">3반</option>
+            <option value="4">4반</option>
+            <option value="5">5반</option>
+            <option value="6">6반</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="input-nickname">닉네임</label>
+          <input type="text" id="input-nickname" maxlength="10" placeholder="닉네임을 입력하세요" />
+        </div>
+        <button id="btn-register" class="primary-btn">명예의 전당에 등록</button>
+        <p id="register-status" class="register-status"></p>
+        <p class="privacy-note">* 입력한 반과 닉네임은 학습 활동을 위한 명예의 전당 랭킹 표시 목적으로만 사용되며, 그 외의 용도로 사용되지 않습니다.</p>
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-retry" class="secondary-btn">다시 도전하기</button>
+        <button id="btn-view-ranking" class="secondary-btn">🏆 명예의 전당 보기</button>
+        <button id="btn-home" class="secondary-btn">처음으로</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 명예의 전당 화면 ============ -->
+  <section id="screen-ranking" class="screen">
+    <div class="panel">
+      <h1 class="title">🏆 명예의 전당 🏆</h1>
+      <div class="btn-row" id="ranking-tab-row">
+        <button class="tab-btn active" data-tab="beginner">초보</button>
+        <button class="tab-btn" data-tab="intermediate">중급</button>
+        <button class="tab-btn" data-tab="advanced">상급</button>
+      </div>
+      <div class="ranking-table-wrap">
+        <table class="ranking-table">
+          <thead>
+            <tr><th>순위</th><th>반</th><th>닉네임</th><th>점수</th><th>도달단계</th><th>콤보</th></tr>
+          </thead>
+          <tbody id="ranking-body">
+            <tr><td colspan="6" class="ranking-loading">불러오는 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button id="btn-ranking-back" class="secondary-btn">처음으로</button>
+    </div>
+  </section>
+
+  <footer class="site-footer">©수민T의 과학실험실. All rights reserved.</footer>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
