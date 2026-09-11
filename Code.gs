@@ -5,6 +5,8 @@
  *
  * 시트 헤더(자동 생성): 반 | 닉네임 | 난이도 | 달성레벨 | 점수 | 콤보 | 날짜
  * 순위는 점수(총점) 기준 내림차순으로 정렬됩니다.
+ * 같은 반 + 같은 닉네임 + 같은 난이도로 다시 등록하면 새 행을 추가하지 않고
+ * 기존 행을 최신 기록으로 덮어씁니다(난이도가 다르면 별도 기록으로 유지).
  */
 
 const SHEET_NAME = "기록";
@@ -48,10 +50,33 @@ function handleSave(e) {
   }
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  try {
+    lock.waitLock(8000);
+  } catch (lockErr) {
+    // 동시 접속이 몰려 락을 못 얻은 경우: 클라이언트가 자동으로 재시도한다.
+    return jsonOutput({ success: false, message: "서버가 바쁩니다. 잠시 후 다시 시도해주세요." });
+  }
+
   try {
     const sheet = getSheet_();
-    sheet.appendRow([klass, nickname, difficulty, stage, score, combo, new Date()]);
+    const values = sheet.getDataRange().getValues();
+
+    // 같은 반 + 닉네임 + 난이도의 기존 기록을 찾아서 있으면 덮어쓰고, 없으면 새로 추가
+    let targetRow = -1;
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      if (String(row[0]) === klass && String(row[1]) === nickname && String(row[2]) === difficulty) {
+        targetRow = i + 1; // 시트는 1행부터 시작(1행은 헤더)
+        break;
+      }
+    }
+
+    const rowData = [klass, nickname, difficulty, stage, score, combo, new Date()];
+    if (targetRow > 0) {
+      sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
+    } else {
+      sheet.appendRow(rowData);
+    }
   } finally {
     lock.releaseLock();
   }

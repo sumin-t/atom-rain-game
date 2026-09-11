@@ -139,10 +139,21 @@
   <section id="screen-ranking" class="screen">
     <div class="panel">
       <h1 class="title">🏆 명예의 전당 🏆</h1>
-      <div class="btn-row" id="ranking-tab-row">
-        <button class="tab-btn active" data-tab="beginner">초보</button>
-        <button class="tab-btn" data-tab="intermediate">중급</button>
-        <button class="tab-btn" data-tab="advanced">상급</button>
+      <div class="ranking-controls">
+        <div class="btn-row" id="ranking-tab-row">
+          <button class="tab-btn active" data-tab="beginner">초보</button>
+          <button class="tab-btn" data-tab="intermediate">중급</button>
+          <button class="tab-btn" data-tab="advanced">상급</button>
+        </div>
+        <select id="ranking-class-filter" aria-label="반 필터">
+          <option value="all">전체 반</option>
+          <option value="1">1반</option>
+          <option value="2">2반</option>
+          <option value="3">3반</option>
+          <option value="4">4반</option>
+          <option value="5">5반</option>
+          <option value="6">6반</option>
+        </select>
       </div>
       <div class="ranking-table-wrap">
         <table class="ranking-table">

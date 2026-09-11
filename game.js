@@ -5,7 +5,7 @@
    Code.gs를 구글 시트에 배포한 뒤 나오는 "웹 앱 URL"을 붙여넣으면
    명예의 전당 등록/조회 기능이 활성화됩니다.
    ============================================================ */
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjA2lT7N6pGZZaUgb5XqWbNS0ewmEWgms2nuqICK1_crWVoYywHrkkjv3aBEzZMLV-5g/exec"; 
+const APPS_SCRIPT_URL = ""; // 예: "https://script.google.com/macros/s/AKfycb.../exec"
 
 /* ------------------------- 원소 데이터 ------------------------- */
 // 원자번호 1~20
@@ -66,7 +66,8 @@ const MODE_LABEL = { symbol: "원소 기호", name: "원소 이름" };
 /* ------------------------- 게임 설정 ------------------------- */
 const CORRECT_PER_STAGE = 8;      // 이만큼 맞히면 다음 단계로
 const WRONG_SCORE_PENALTY = 10;   // 오답 제출 시 감점
-const MISS_PENALTY = 14;          // 원소가 바다에 닿았을 때 수면 상승(%)
+const MISS_PENALTY = 8;           // 원소가 바다에 닿았을 때 수면 상승(%)
+const WATER_EASE_PER_SEC = 2.2;   // 수면 높이가 목표치로 부드럽게 따라가는 속도(클수록 빠르게 따라붙음)
 const MAX_STAGE = 10;
 // px/sec (index 1~10 사용)
 const STAGE_SPEED = [0, 50, 65, 80, 95, 110, 130, 150, 175, 200, 230];
@@ -95,6 +96,7 @@ const state = {
   missCount: 0,
   wrongCount: 0,
   water: 0,
+  waterTarget: 0,
   running: false,
   paused: false,
   pauseStartedAt: 0,
@@ -201,6 +203,7 @@ function startGame() {
   state.missCount = 0;
   state.wrongCount = 0;
   state.water = 0;
+  state.waterTarget = 0;
   state.spawnTimer = 300; // 시작 후 잠시 뒤 첫 단어 등장
   state.waveOffset = 0;
   state.startTime = performance.now();
@@ -318,7 +321,15 @@ function update(dt) {
     state.spawnTimer = base * (0.8 + Math.random() * 0.4);
   }
 
+  // 수면 높이는 목표치(waterTarget)로 부드럽게 따라가도록 보간 — 급격히 훅 차오르는 느낌을 줄임
+  const easeAmount = (WATER_EASE_PER_SEC * dt) / 1000;
+  state.water += (state.waterTarget - state.water) * Math.min(1, easeAmount);
+  if (Math.abs(state.waterTarget - state.water) < 0.05) state.water = state.waterTarget;
+
   const surfaceY = state.logicalHeight * (1 - state.water / 100);
+
+  // 입력창에 이미 정답이 입력되어 있다면(아직 Enter를 안 눌렀어도) 바닥에 닿는 순간 정답으로 인정
+  const pendingVal = (typeInput.value || "").trim();
 
   for (const w of state.activeWords) {
     if (w.matched) {
@@ -327,6 +338,11 @@ function update(dt) {
     }
     w.y += (w.speed * dt) / 1000;
     if (w.y + w.boxH / 2 >= surfaceY) {
+      if (pendingVal && answerTextFor(w.el) === pendingVal) {
+        handleCorrect(w);
+        typeInput.value = "";
+        continue;
+      }
       w.matched = true;
       w.missed = true;
       w.explodeT = 0;
@@ -338,13 +354,13 @@ function update(dt) {
 
   state.activeWords = state.activeWords.filter((w) => !(w.matched && w.explodeT > 260));
 
-  if (state.water >= 100) {
+  if (state.water >= 99.5) {
     endGame();
   }
 }
 
 function raiseWater(amount) {
-  state.water = Math.min(100, state.water + amount);
+  state.waterTarget = Math.min(100, state.waterTarget + amount);
 }
 
 function advanceStageIfNeeded() {
@@ -374,7 +390,7 @@ function handleCorrect(word) {
   state.score += 10 * state.stage + comboScoreBonus(state.combo);
   state.correctCount++;
   state.stageCorrect++;
-  state.water = Math.max(0, state.water - comboWaterDecrease(state.combo));
+  state.waterTarget = Math.max(0, state.waterTarget - comboWaterDecrease(state.combo));
   advanceStageIfNeeded();
 }
 
@@ -588,6 +604,7 @@ function endGame() {
   document.getElementById("register-status").textContent = "";
   document.getElementById("register-status").className = "register-status";
   document.getElementById("input-nickname").value = "";
+  document.getElementById("btn-register").disabled = false;
 
   showScreen("result");
 }
@@ -602,6 +619,26 @@ document.getElementById("btn-home").addEventListener("click", () => {
 document.getElementById("btn-view-ranking").addEventListener("click", () => {
   openRanking(state.difficulty);
 });
+
+// 동시 접속이 몰려 구글 시트 락(lock)이나 일시적인 오류가 나는 경우를 대비해
+// 실패 시 짧은 대기 후 자동으로 몇 차례 재시도한다.
+async function fetchJsonWithRetry(url, { retries = 2, delayMs = 700 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.success) return data;
+      throw new Error((data && data.message) || "요청 실패");
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
+}
 
 /* ------------------------- 명예의 전당: 등록 ------------------------- */
 document.getElementById("btn-register").addEventListener("click", async () => {
@@ -637,17 +674,12 @@ document.getElementById("btn-register").addEventListener("click", async () => {
   });
 
   try {
-    const res = await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`);
-    const data = await res.json();
-    if (data && data.success) {
-      statusEl.textContent = "명예의 전당에 등록되었습니다! 🎉";
-      statusEl.className = "register-status";
-      btn.disabled = true;
-    } else {
-      throw new Error((data && data.message) || "등록 실패");
-    }
+    await fetchJsonWithRetry(`${APPS_SCRIPT_URL}?${params.toString()}`);
+    statusEl.textContent = "명예의 전당에 등록되었습니다! 🎉";
+    statusEl.className = "register-status";
+    btn.disabled = true;
   } catch (err) {
-    statusEl.textContent = "등록에 실패했습니다. 잠시 후 다시 시도해주세요.";
+    statusEl.textContent = "서버 접속이 많이 몰려 있어요. 잠시 후 다시 시도해주세요.";
     statusEl.className = "register-status error";
     btn.disabled = false;
   }
@@ -680,6 +712,17 @@ function openRanking(preferTab) {
   loadRanking(currentRankingTab);
 }
 
+let lastRankingRows = [];
+let currentClassFilter = "all";
+const rankingClassFilter = document.getElementById("ranking-class-filter");
+
+if (rankingClassFilter) {
+  rankingClassFilter.addEventListener("change", (e) => {
+    currentClassFilter = e.target.value;
+    renderRankingRows();
+  });
+}
+
 async function loadRanking(tabKey) {
   rankingBody.innerHTML = `<tr><td colspan="6" class="ranking-loading">불러오는 중...</td></tr>`;
 
@@ -692,19 +735,31 @@ async function loadRanking(tabKey) {
   const params = new URLSearchParams({ action: "list", difficulty: difficultyLabel });
 
   try {
-    const res = await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`);
-    const data = await res.json();
-    if (!data || !data.success) throw new Error("불러오기 실패");
+    const data = await fetchJsonWithRetry(`${APPS_SCRIPT_URL}?${params.toString()}`);
+    lastRankingRows = data.data || [];
+    renderRankingRows();
+  } catch (err) {
+    lastRankingRows = [];
+    rankingBody.innerHTML = `<tr><td colspan="6" class="ranking-empty">랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</td></tr>`;
+  }
+}
 
-    const rows = (data.data || []).slice(0, 30);
-    if (rows.length === 0) {
-      rankingBody.innerHTML = `<tr><td colspan="6" class="ranking-empty">아직 등록된 기록이 없습니다.</td></tr>`;
-      return;
-    }
+// 반 필터가 "전체"가 아니면 해당 반 학생들끼리만 다시 순위를 매겨서 보여준다(반별 등수)
+function renderRankingRows() {
+  const filtered =
+    currentClassFilter === "all"
+      ? lastRankingRows
+      : lastRankingRows.filter((r) => String(r.klass) === currentClassFilter);
 
-    rankingBody.innerHTML = rows
-      .map(
-        (r, i) => `
+  const rows = filtered.slice(0, 30);
+  if (rows.length === 0) {
+    rankingBody.innerHTML = `<tr><td colspan="6" class="ranking-empty">아직 등록된 기록이 없습니다.</td></tr>`;
+    return;
+  }
+
+  rankingBody.innerHTML = rows
+    .map(
+      (r, i) => `
       <tr>
         <td>${i + 1}</td>
         <td>${escapeHtml(r.klass)}반</td>
@@ -713,11 +768,8 @@ async function loadRanking(tabKey) {
         <td>${escapeHtml(r.stage)}</td>
         <td>${escapeHtml(r.combo)}</td>
       </tr>`
-      )
-      .join("");
-  } catch (err) {
-    rankingBody.innerHTML = `<tr><td colspan="6" class="ranking-empty">랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</td></tr>`;
-  }
+    )
+    .join("");
 }
 
 function escapeHtml(v) {

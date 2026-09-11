@@ -384,6 +384,24 @@ kbd {
   border-color: var(--acid);
 }
 
+.ranking-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#ranking-class-filter {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: var(--chip-bg);
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
 .ranking-table-wrap { overflow-x: auto; margin-top: 16px; }
 
 .ranking-table {
