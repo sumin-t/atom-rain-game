@@ -5,7 +5,7 @@
    Code.gs를 구글 시트에 배포한 뒤 나오는 "웹 앱 URL"을 붙여넣으면
    명예의 전당 등록/조회 기능이 활성화됩니다.
    ============================================================ */
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywJ13WtuEySqC19-nWMCIc9d80ehXaSjuF_LXy4oSxIUVtNd0hcayPrrjeoEUK7wZ-zA/exec"; 
+const APPS_SCRIPT_URL = "https://docs.google.com/spreadsheets/d/12ydYSPUiDIEuHsbO8buSiWWOSf17Psybon-PmxAZTWA/edit?usp=sharing"; 
 
 /* ------------------------- 원소 데이터 ------------------------- */
 // 원자번호 1~20
